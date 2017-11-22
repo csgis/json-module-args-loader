@@ -26,7 +26,7 @@ describe('module', function () {
     read.restore();
   });
 
-  it('adds dependencies', function (done) {
+  it('adds args', function (done) {
     const source = {
       'modules': {
         'map': './map',
@@ -36,16 +36,16 @@ describe('module', function () {
 
     cb = function (e, ret) {
       let json = JSON.parse(ret);
-      assert.equal(json.deps.map, 'dep1');
-      assert.equal(json.deps.layers, 'dep2');
+      assert.deepEqual(json.args.map, ['opts', 'dep1']);
+      assert.deepEqual(json.args.layers, ['opts', 'dep2']);
       done();
     };
 
     loader.call(context, JSON.stringify(source));
   });
 
-  it('adds dependencies to specific key', function (done) {
-    context.options = { deps: 'd' };
+  it('adds args to specific key', function (done) {
+    context.options = { args: 'a' };
     const source = {
       'modules': {
         'map': './map',
@@ -55,8 +55,8 @@ describe('module', function () {
 
     cb = function (e, ret) {
       let json = JSON.parse(ret);
-      assert.equal(json.d.map, 'dep1');
-      assert.equal(json.d.layers, 'dep2');
+      assert.deepEqual(json.a.map, ['opts', 'dep1']);
+      assert.deepEqual(json.a.layers, ['opts', 'dep2']);
       done();
     };
 
@@ -74,21 +74,21 @@ describe('module', function () {
 
     cb = function (e, ret) {
       let json = JSON.parse(ret);
-      assert.equal(json.deps.map, 'dep1');
-      assert.equal(json.deps.layers, 'dep2');
+      assert.deepEqual(json.args.map, ['opts', 'dep1']);
+      assert.deepEqual(json.args.layers, ['opts', 'dep2']);
       done();
     };
 
     loader.call(context, JSON.stringify(source));
   });
 
-  it('does not override existing deps', function (done) {
+  it('does not override existing args', function (done) {
     const source = {
       'modules': {
         'map': './map',
         'layers': 'layers-dependency'
       },
-      'deps': {
+      'args': {
         'map': ['x'],
         'layers': ['y']
       }
@@ -96,8 +96,29 @@ describe('module', function () {
 
     cb = function (e, ret) {
       let json = JSON.parse(ret);
-      assert.equal(json.deps.map, 'x');
-      assert.equal(json.deps.layers, 'y');
+      assert.deepEqual(json.args.map, ['x']);
+      assert.deepEqual(json.args.layers, ['y']);
+
+      done();
+    };
+
+    loader.call(context, JSON.stringify(source));
+  });
+
+  it('skips args if specified', function (done) {
+    context.options = { skip: 1 };
+    const source = {
+      'modules': {
+        'map': './map',
+        'layers': 'layers-dependency'
+      }
+    };
+
+    cb = function (e, ret) {
+      let json = JSON.parse(ret);
+      assert.deepEqual(json.args.map, ['dep1']);
+      assert.deepEqual(json.args.layers, ['dep2']);
+
       done();
     };
 
