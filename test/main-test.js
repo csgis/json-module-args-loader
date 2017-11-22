@@ -1,139 +1,106 @@
 debugger; // eslint-disable-line no-debugger
 
 import loader from '../src/main.js';
-import { load } from '../src/main.js';
 import assert from 'assert';
 import sinon from 'sinon';
 import fs from 'fs';
-
-const SOURCE = {
-  'modules': {
-    'map': './map',
-    'layers': 'layers-dependency'
-  },
-  'deps': {
-    'layers': ['map']
-  }
-};
-
-let map = (opts) => opts;
-let layers = (opts, mymap) => { mymap.ten = 10; };
-let app = { deps: { layers: ['map'] } };
 
 describe('module', function () {
   let cb;
   let context;
   let read;
+  let contents;
 
   beforeEach(function () {
     context = {
       async: () => cb,
-      resolve: (ctx, module, callback) => callback(null, '')
+      resolve: (ctx, module, callback) => callback(null, module)
     };
+    contents = {};
+    contents['./map'] = 'module.exports = function bricjs(opts, dep1){}';
+    contents['layers-dependency'] = 'module.exports = function bricjs(opts, dep2){}';
+    read = sinon.stub(fs, 'readFileSync').callsFake(key => contents[key]);
   });
 
   afterEach(function () {
     read.restore();
   });
 
-  function stubRead(value) {
-    read = sinon.stub(fs, 'readFileSync').callsFake(() => value);
-  }
+  it('adds dependencies', function (done) {
+    const source = {
+      'modules': {
+        'map': './map',
+        'layers': 'layers-dependency'
+      }
+    };
 
-  it('imports modules', function (done) {
-    stubRead('module.exports = function bricjs(opts, a){}');
     cb = function (e, ret) {
-      assert(ret.match(/import { bricjs as map } from '.\/map'/));
-      assert(ret.match(/import { bricjs as layers } from 'layers-dependency'/));
+      let json = JSON.parse(ret);
+      assert.equal(json.deps.map, 'dep1');
+      assert.equal(json.deps.layers, 'dep2');
       done();
     };
 
-    loader.call(context, JSON.stringify(SOURCE));
+    loader.call(context, JSON.stringify(source));
   });
 
-  it('adds load function', function (done) {
-    stubRead('module.exports = function bricjs(opts, a){}');
+  it('adds dependencies to specific key', function (done) {
+    context.options = { deps: 'd' };
+    const source = {
+      'modules': {
+        'map': './map',
+        'layers': 'layers-dependency'
+      }
+    };
+
     cb = function (e, ret) {
-      assert(ret.match(/function\s*load\s*\(.*\)/));
+      let json = JSON.parse(ret);
+      assert.equal(json.d.map, 'dep1');
+      assert.equal(json.d.layers, 'dep2');
       done();
     };
 
-    loader.call(context, JSON.stringify(SOURCE));
+    loader.call(context, JSON.stringify(source));
   });
 
-  it('exports function', function (done) {
-    stubRead('module.exports = function bricjs(opts, a){}');
+  it('uses modules from specific key', function (done) {
+    context.options = { modules: 'm' };
+    const source = {
+      'm': {
+        'map': './map',
+        'layers': 'layers-dependency'
+      }
+    };
+
     cb = function (e, ret) {
-      assert(ret.match(/export default config => load\(.*, config, { map,layers }, DEPS\);/));
+      let json = JSON.parse(ret);
+      assert.equal(json.deps.map, 'dep1');
+      assert.equal(json.deps.layers, 'dep2');
       done();
     };
 
-    loader.call(context, JSON.stringify(SOURCE));
+    loader.call(context, JSON.stringify(source));
   });
 
-  it('exports DEPS', function (done) {
-    stubRead('module.exports = function bricjs(opts, dependency){}');
-    cb = function (e, ret) {
-      assert(ret.match(/const DEPS = {"map":\["dependency"\],"layers":\["dependency"\]};/));
-      done();
-    };
-
-    loader.call(context, JSON.stringify(SOURCE));
-  });
-
-  it('handles errors', function (done) {
-    context = {
-      async: () => function (e) {
-        assert(e);
-        done();
+  it('does not override existing deps', function (done) {
+    const source = {
+      'modules': {
+        'map': './map',
+        'layers': 'layers-dependency'
       },
-      resolve: (ctx, module, callback) => callback('error')
+      'deps': {
+        'map': ['x'],
+        'layers': ['y']
+      }
     };
 
-    loader.call(context, JSON.stringify(SOURCE));
-  });
-
-  it('loads modules', function (done) {
-    let config = {
-      map: { boo: 2 }
-    };
-    let test = () => assert.equal(10, config.map.ten);
-    load(app, [config], { map, layers }, app.deps).then(test).then(done, done);
-  });
-
-  it('disables modules', function (done) {
-    let config = {
-      map: { boo: 2 },
-      layers: { enabled: false }
-    };
-    let test = () => assert(!config.map.ten);
-    load(app, [config], { map, layers }, app.deps).then(test).then(done, done);
-  });
-
-  it('ignores unnamed functions', function (done) {
-    stubRead('module.exports = function(opts, dependency){}');
     cb = function (e, ret) {
-      assert(ret.match(/const DEPS = {};/));
+      let json = JSON.parse(ret);
+      assert.equal(json.deps.map, 'x');
+      assert.equal(json.deps.layers, 'y');
       done();
     };
 
-    loader.call(context, JSON.stringify(SOURCE));
-  });
-
-  it('uses config as object', function (done) {
-    let config = {
-      map: { boo: 2 }
-    };
-    let test = () => assert.equal(10, config.map.ten);
-    load(app, config, { map, layers }, app.deps).then(test).then(done, done);
-  });
-
-  it('throws error on invalid config', function () {
-    try {
-      load(app, 'invalid_config', { map, layers }, app.deps);
-      assert.fail();
-    } catch (e) {
-      // ignore
-    }
+    loader.call(context, JSON.stringify(source));
   });
 });
