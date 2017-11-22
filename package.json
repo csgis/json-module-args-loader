@@ -1,11 +1,10 @@
 {
-	"name": "@csgis/bricjs-loader",
+	"name": "@csgis/json-module-args-loader",
 	"version": "0.0.1",
-	"repository": "git@github.com:csgis/bricjs-loader.git",
+	"repository": "git@github.com:csgis/json-module-args-loader.git",
 	"author": "Víctor González <victor.gonzalez@geomati.co>",
 	"main": "dist/main.js",
 	"dependencies": {
-		"es-arguments": "^1.0.2",
 		"uglify-js": "^3.1.5"
 	},
 	"devDependencies": {
