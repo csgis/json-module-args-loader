@@ -1,5 +1,13 @@
-let fs = require('fs');
-let UglifyJS = require('uglify-js');
+import fs from 'fs';
+import UglifyJS from 'uglify-js';
+import loaderUtils from 'loader-utils';
+
+const DEFAULT_OPTS = {
+  modules: 'modules',
+  args: 'args',
+  'function': 'bricjs',
+  skip: 0
+};
 
 const UGLIFY_OPTS = {
   parse: {},
@@ -53,21 +61,17 @@ class Parser {
 }
 
 export default function (source) {
-  let opts = this.options || {};
-  let modulesKey = opts.modules || 'modules';
-  let argsKey = opts.args || 'args';
-  let functionName = opts.function || 'bricjs';
-  let skip = opts.skip || 0;
+  const opts = Object.assign({}, DEFAULT_OPTS, loaderUtils.getOptions(this));
 
   let json = JSON.parse(source);
-  let modules = json[modulesKey];
-  let args = json[argsKey];
+  let modules = json[opts.modules];
+  let args = json[opts.args];
 
-  let parser = new Parser(this, functionName);
-  let promises = parser.getArgs(modules, skip);
+  let parser = new Parser(this, opts.function);
+  let promises = parser.getArgs(modules, opts.skip);
   let cb = this.async();
   Promise.all(promises).then(function (values) {
-    json[argsKey] = Object.assign(...values, args);
+    json[opts.args] = Object.assign(...values, args);
     cb(null, JSON.stringify(json));
   }).catch(err => cb(err));
 }

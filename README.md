@@ -29,8 +29,8 @@ yarn add -D @csgis/json-module-args-loader
 ```js
 {
    test: /app\.json$/,
-   use: [{
-     loader: 'json-module-args-loader',
+   use: ['json-loader', {
+     loader: '@csgis/json-module-args-loader',
      options: {
        'function': 'f',
        'skip': 1

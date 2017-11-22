@@ -45,7 +45,7 @@ describe('module', function () {
   });
 
   it('adds args to specific key', function (done) {
-    context.options = { args: 'a' };
+    context.query = { args: 'a' };
     const source = {
       'modules': {
         'map': './map',
@@ -64,7 +64,7 @@ describe('module', function () {
   });
 
   it('uses modules from specific key', function (done) {
-    context.options = { modules: 'm' };
+    context.query = { modules: 'm' };
     const source = {
       'm': {
         'map': './map',
@@ -106,7 +106,7 @@ describe('module', function () {
   });
 
   it('skips args if specified', function (done) {
-    context.options = { skip: 1 };
+    context.query = { skip: 1 };
     const source = {
       'modules': {
         'map': './map',
