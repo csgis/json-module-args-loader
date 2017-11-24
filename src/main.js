@@ -23,32 +23,40 @@ class Parser {
   constructor(loader, functionName) {
     this.loader = loader;
     this.exportName = functionName;
-    this.walker = new UglifyJS.TreeWalker(this.visit.bind(this));
+
+    this._createPromise = this._createPromise.bind(this);
+    this.visit = this.visit.bind(this);
+
+    this.walker = new UglifyJS.TreeWalker(this.visit);
+  }
+
+  _createPromise(name) {
+    return new Promise((resolve, reject) => {
+      this.loader.resolve(this.loader.context, this.modules[name], (err, path) => {
+        if (err) {
+          reject(err);
+        } else if (!fs.existsSync(path)) {
+          reject(new Error(`Module '${name}' resolves to '${path}', which does not exist.`));
+        } else {
+          let contents = fs.readFileSync(path, 'UTF-8');
+          let parsed = UglifyJS.minify(contents, UGLIFY_OPTS);
+          if (parsed.ast && parsed.ast.walk) {
+            parsed.ast.walk(this.walker);
+            resolve({
+              [name]: this.args
+            });
+          } else {
+            reject(new SyntaxError(`Cannot parse '${path}'. Caused by: "${parsed.error.message}" `));
+          }
+        }
+      });
+    });
   }
 
   getArgs(modules, skip) {
-    let loader = this.loader;
-    let walker = this.walker;
-    let parser = this;
     this.skip = skip;
-
-    let promises = [];
-    Object.keys(modules).forEach(function (name) {
-      let promise = new Promise(function (resolve, reject) {
-        loader.resolve(loader.context, modules[name], function (err, result) {
-          if (err) reject(err);
-
-          let contents = fs.readFileSync(result, 'UTF-8');
-          UglifyJS.minify(contents, UGLIFY_OPTS).ast.walk(walker);
-          resolve({
-            [name]: parser.args
-          });
-        });
-      });
-      promises.push(promise);
-    });
-
-    return promises;
+    this.modules = modules;
+    return Object.keys(modules).map(this._createPromise);
   }
 
   visit(node) {

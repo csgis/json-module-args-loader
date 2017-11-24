@@ -6,10 +6,20 @@ import sinon from 'sinon';
 import fs from 'fs';
 
 describe('module', function () {
+  // fs mocks
+  let read;
+  let exists;
+
   let cb;
   let context;
-  let read;
   let contents;
+
+  const DEFAULT_SOURCE = {
+    'modules': {
+      'map': './map',
+      'layers': 'layers-dependency'
+    }
+  };
 
   beforeEach(function () {
     context = {
@@ -20,47 +30,38 @@ describe('module', function () {
     contents['./map'] = 'module.exports = function bricjs(opts, dep1){}';
     contents['layers-dependency'] = 'module.exports = function bricjs(opts, dep2){}';
     read = sinon.stub(fs, 'readFileSync').callsFake(key => contents[key]);
+    exists = sinon.stub(fs, 'existsSync').callsFake(() => true);
   });
 
   afterEach(function () {
     read.restore();
+    exists.restore();
   });
 
   it('adds args', function (done) {
-    const source = {
-      'modules': {
-        'map': './map',
-        'layers': 'layers-dependency'
-      }
-    };
-
     cb = function (e, ret) {
+      assert(!e);
       let json = JSON.parse(ret);
       assert.deepEqual(json.args.map, ['opts', 'dep1']);
       assert.deepEqual(json.args.layers, ['opts', 'dep2']);
       done();
     };
 
-    loader.call(context, JSON.stringify(source));
+    loader.call(context, JSON.stringify(DEFAULT_SOURCE));
   });
 
   it('adds args to specific key', function (done) {
     context.query = { args: 'a' };
-    const source = {
-      'modules': {
-        'map': './map',
-        'layers': 'layers-dependency'
-      }
-    };
 
     cb = function (e, ret) {
+      assert(!e);
       let json = JSON.parse(ret);
       assert.deepEqual(json.a.map, ['opts', 'dep1']);
       assert.deepEqual(json.a.layers, ['opts', 'dep2']);
       done();
     };
 
-    loader.call(context, JSON.stringify(source));
+    loader.call(context, JSON.stringify(DEFAULT_SOURCE));
   });
 
   it('uses modules from specific key', function (done) {
@@ -73,6 +74,7 @@ describe('module', function () {
     };
 
     cb = function (e, ret) {
+      assert(!e);
       let json = JSON.parse(ret);
       assert.deepEqual(json.args.map, ['opts', 'dep1']);
       assert.deepEqual(json.args.layers, ['opts', 'dep2']);
@@ -95,6 +97,7 @@ describe('module', function () {
     };
 
     cb = function (e, ret) {
+      assert(!e);
       let json = JSON.parse(ret);
       assert.deepEqual(json.args.map, ['x']);
       assert.deepEqual(json.args.layers, ['y']);
@@ -107,14 +110,8 @@ describe('module', function () {
 
   it('skips args if specified', function (done) {
     context.query = { skip: 1 };
-    const source = {
-      'modules': {
-        'map': './map',
-        'layers': 'layers-dependency'
-      }
-    };
-
     cb = function (e, ret) {
+      assert(!e);
       let json = JSON.parse(ret);
       assert.deepEqual(json.args.map, ['dep1']);
       assert.deepEqual(json.args.layers, ['dep2']);
@@ -122,6 +119,41 @@ describe('module', function () {
       done();
     };
 
-    loader.call(context, JSON.stringify(source));
+    loader.call(context, JSON.stringify(DEFAULT_SOURCE));
+  });
+
+  it('fails if error resolving', function (done) {
+    context.resolve = (ctx, module, callback) => callback(new Error('fail'), module);
+
+    cb = e => {
+      assert(e);
+      done();
+    };
+
+    loader.call(context, JSON.stringify(DEFAULT_SOURCE));
+  });
+
+  it('fails if resolved path does not exist', function (done) {
+    exists.restore();
+    exists = sinon.stub(fs, 'existsSync').callsFake(() => false);
+
+    cb = e => {
+      assert(e);
+      done();
+    };
+
+    loader.call(context, JSON.stringify(DEFAULT_SOURCE));
+  });
+
+  it('fails if errror parsing', function (done) {
+    read.restore();
+    read = sinon.stub(fs, 'readFileSync').callsFake(() => 'cannot parse this');
+
+    cb = e => {
+      assert(e);
+      done();
+    };
+
+    loader.call(context, JSON.stringify(DEFAULT_SOURCE));
   });
 });
